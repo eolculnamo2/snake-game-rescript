@@ -40,6 +40,6 @@
   },
   "devDependencies": {
     "gentype": "^4.5.0",
-    "rescript": "^9.1.4"
+    "rescript": "^10.0.1"
   }
 }
