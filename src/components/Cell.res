@@ -1,7 +1,10 @@
+exception InvalidDifference(int)
 exception InvalidHeadPosition
+exception BadArgument(string)
 exception InvalidLengthOrId
-exception TailPrevNotFound(string)
+exception TailNextNotFound(string)
 exception ExcessiveTailRecursion
+
 type direction = Left | Right | Up | Down
 type cellId = int
 
@@ -21,9 +24,7 @@ let max = ref(0)
 let rec findTail = (cell: t, cells: array<t>): cellId => {
   max := max.contents + 1
   switch cell.prev {
-  | Some(_) if max.contents > 1000 => {
-      raise(ExcessiveTailRecursion)
-    }
+  | Some(_) if max.contents > 1000 => raise(ExcessiveTailRecursion)
   | Some(c) =>
     cells->Js.Array2.find(cell => cell.location == c)->Belt.Option.getExn->findTail(cells)
   | None => {
@@ -41,7 +42,10 @@ let moveTailToHead = (cells: array<t>, nextPos: direction, head: t) => {
   let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
   let tailNext = switch tail.next {
   | Some(id) => cells->Js.Array2.find(c => c.location == id)->Belt.Option.getExn
-  | None => raise(TailPrevNotFound(`no tail for ${tail.location->Belt.Int.toString}`))
+  | None => {
+      Js.log(cells)
+      raise(TailNextNotFound(tail.location->Belt.Int.toString))
+    }
   }
   let newTailLocation = switch nextPos {
   | Right => head.location + 1
@@ -76,16 +80,25 @@ let moveTailToHead = (cells: array<t>, nextPos: direction, head: t) => {
 }
 
 let validateLength = (id, length) => length > id ? raise(InvalidLengthOrId) : ()
-let rec appendToSnake = (cells: array<t>, id, length) => {
+let rec appendToSnake = (cells: array<t>, id, length, ~nextDir) => {
   validateLength(id, length)
+
+  let nextId = switch nextDir {
+  | Left => id - 1
+  | Right => id + 1
+  | Up => id - Board.width
+  | Down => id + Board.width
+  }
+
   switch length {
   | 0 => cells
   | _ => {
       let cell = cells->Belt.Array.get(id)->Belt.Option.getExn
-      let next = switch cells->Belt.Array.get(id + 1) {
+      let next = switch cells->Belt.Array.get(nextId) {
       | Some(c) => Some(c.location)
       | None => None
       }
+      // id - 1 assumes always right direction, may have to change later
       let prev = switch cells->Belt.Array.get(id - 1) {
       | Some(c) if length > 1 => Some(c.location)
       | _ => None
@@ -98,20 +111,48 @@ let rec appendToSnake = (cells: array<t>, id, length) => {
           c
         }
       })
-      ->appendToSnake(id - 1, length - 1)
+      ->appendToSnake(id - 1, length - 1, ~nextDir)
     }
   }
 }
 
-let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (array<t>, int) => {
+let inferDirectionFromNext = (cell: t): direction => {
+  let nextId = switch cell.next {
+  | None => raise(BadArgument("Cannot infer direction from head. Use nextDir state instead"))
+  | Some(id) => id
+  }
+
+  let difference = nextId - cell.location
+  switch difference {
+  | d if d == 1 => Right
+  | d if d == -1 => Left
+  | d if d == Board.width => Down
+  | d if d == Board.width * -1 => Up
+  | _ => raise(InvalidDifference(difference))
+  }
+}
+
+let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (
+  array<t>,
+  int,
+) => {
   if head.location == appleLocation {
     let tailId = findTail(head, cells)
     let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
+    let inferredDirection = inferDirectionFromNext(tail)
     let newAppleLocation = Js.Math.random_int(0, Board.area - 1)
-    let prevTail = {...tail, prev: Some(tail.location - 1)}
+
+    // THIS MIGHT BE WRONG
+    let newPrevOffset= switch inferredDirection {
+      | Right => -1
+      | Left => 1
+      | Up => Board.width
+      | Down => Board.width * -1
+    }
+    let prevTail = {...tail, prev: Some(tail.location + newPrevOffset)}
     let c =
       cells
-      ->appendToSnake(tail.location - 1, 1)
+      ->appendToSnake(tail.location + newPrevOffset, 1, ~nextDir=inferredDirection)
       ->Belt.Array.mapWithIndex((i, cell) => {
         if i == prevTail.location {
           prevTail
@@ -121,7 +162,7 @@ let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (array<t>, 
           cell
         }
       })
-      (c, newAppleLocation)
+    (c, newAppleLocation)
   } else {
     (cells, appleLocation)
   }
@@ -138,7 +179,7 @@ let handleTick = (cells: array<t>, nextPos: direction, appleLocation: cellId): h
   let newCells = c->moveTailToHead(nextPos, head)
   {
     newCells: newCells,
-    appleLocation: appleLocation
+    appleLocation: appleLocation,
   }
 }
 
@@ -163,7 +204,7 @@ let initSnake = (cells: array<t>): array<t> => {
       c
     }
   })
-  ->appendToSnake(headCell.location - 1, Board.initSnakeSize - 1)
+  ->appendToSnake(headCell.location - 1, Board.initSnakeSize - 1, ~nextDir=Right)
 }
 
 let initCells = (appleLocation: int) => {
@@ -178,7 +219,6 @@ let initCells = (appleLocation: int) => {
     })
   }
   let cells = initSnake(cells)
-  Js.log(cells)
   cells
 }
 

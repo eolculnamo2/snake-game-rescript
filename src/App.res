@@ -20,7 +20,6 @@ let reducer = (state, action) => {
       {...state, cells: result.newCells, apple: result.appleLocation}
     }
   | ChangeDirection(dir) => {
-      Js.log(dir)
       {...state, nextDir: dir}
     }
   }
@@ -31,12 +30,12 @@ let make = () => {
   let (state, dispatch) = React.useReducer(reducer, initState)
 
   React.useEffect1(() => {
-    document["addEventListener"]("keyup", event => {
+    document["addEventListener"]("keydown", event => {
       switch event["key"] {
-      | "w" => dispatch(ChangeDirection(Cell.Up))
-      | "s" => dispatch(ChangeDirection(Cell.Down))
-      | "a" => dispatch(ChangeDirection(Cell.Left))
-      | "d" => dispatch(ChangeDirection(Cell.Right))
+      | "w" | "ArrowUp" => dispatch(ChangeDirection(Cell.Up))
+      | "s" | "ArrowDown" => dispatch(ChangeDirection(Cell.Down))
+      | "a" | "ArrowLeft" => dispatch(ChangeDirection(Cell.Left))
+      | "d" | "ArrowRight" => dispatch(ChangeDirection(Cell.Right))
       | _ => ()
       }
     })
