@@ -132,6 +132,15 @@ let inferDirectionFromNext = (cell: t): direction => {
   }
 }
 
+// guarantee never same location twice to prevent messing up snake length count
+let rec generateNewAppleLocation = (currentLocation, newLocation) => {
+  if currentLocation == newLocation {
+    generateNewAppleLocation(currentLocation, Js.Math.random_int(0, Board.area - 1))
+  } else {
+    newLocation
+  }
+}
+
 let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (
   array<t>,
   int,
@@ -140,7 +149,7 @@ let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (
     let tailId = findTail(head, cells)
     let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
     let inferredDirection = inferDirectionFromNext(tail)
-    let newAppleLocation = Js.Math.random_int(0, Board.area - 1)
+    let newAppleLocation =  generateNewAppleLocation(appleLocation, Js.Math.random_int(0, Board.area - 1))
 
     // THIS MIGHT BE WRONG
     let newPrevOffset= switch inferredDirection {
