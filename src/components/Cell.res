@@ -6,6 +6,7 @@ exception TailNextNotFound(string)
 exception ExcessiveTailRecursion
 
 type direction = Left | Right | Up | Down
+type gameEnding = EdgeCollision | SelfCollision
 type cellId = int
 
 type rec t = {
@@ -34,10 +35,37 @@ let rec findTail = (cell: t, cells: array<t>): cellId => {
   }
 }
 
+let checkBorderCollision = (newTailLocation: cellId, nextPos: direction) => {
+  if newTailLocation > Board.area {
+    Error()
+  } else if newTailLocation < 0 {
+    Error()
+  } else if mod(newTailLocation, Board.width) == Board.width - 1 && nextPos == Left {
+    Error()
+  } else if mod(newTailLocation, Board.width) == 0 && nextPos == Right {
+    Error()
+  } else {
+    Ok()
+  }
+}
+
+let rec checkSelfCollision = (newTailLocation: cellId, head: t, cells: array<t>) => {
+  switch head.prev {
+  | Some(id) =>
+    if id == newTailLocation {
+      Error()
+    } else {
+      let childCell = cells->Js.Array2.find(cell => cell.location == id)->Belt.Option.getExn
+      checkSelfCollision(newTailLocation, childCell, cells)
+    }
+  | None => Ok()
+  }
+}
+
 // move tail to in front of head
 // make head isHead = false and next point to previously tail
 // create new tail by remove prev
-let moveTailToHead = (cells: array<t>, nextPos: direction, head: t) => {
+let moveTailToHead = (cells: array<t>, nextPos: direction, head: t, newTailLocation) => {
   let tailId = findTail(head, cells)
   let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
   let tailNext = switch tail.next {
@@ -46,12 +74,6 @@ let moveTailToHead = (cells: array<t>, nextPos: direction, head: t) => {
       Js.log(cells)
       raise(TailNextNotFound(tail.location->Belt.Int.toString))
     }
-  }
-  let newTailLocation = switch nextPos {
-  | Right => head.location + 1
-  | Left => head.location - 1
-  | Up => head.location - Board.width
-  | Down => head.location + Board.width
   }
 
   let oldHead = {...head, isHead: false, next: Some(newTailLocation)}
@@ -141,22 +163,22 @@ let rec generateNewAppleLocation = (currentLocation, newLocation) => {
   }
 }
 
-let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (
-  array<t>,
-  int,
-) => {
+let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (array<t>, int) => {
   if head.location == appleLocation {
     let tailId = findTail(head, cells)
     let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
     let inferredDirection = inferDirectionFromNext(tail)
-    let newAppleLocation =  generateNewAppleLocation(appleLocation, Js.Math.random_int(0, Board.area - 1))
+    let newAppleLocation = generateNewAppleLocation(
+      appleLocation,
+      Js.Math.random_int(0, Board.area - 1),
+    )
 
     // THIS MIGHT BE WRONG
-    let newPrevOffset= switch inferredDirection {
-      | Right => -1
-      | Left => 1
-      | Up => Board.width
-      | Down => Board.width * -1
+    let newPrevOffset = switch inferredDirection {
+    | Right => -1
+    | Left => 1
+    | Up => Board.width
+    | Down => Board.width * -1
     }
     let prevTail = {...tail, prev: Some(tail.location + newPrevOffset)}
     let c =
@@ -181,15 +203,28 @@ type handleTickReturn = {
   newCells: array<t>,
   appleLocation: int,
 }
-let handleTick = (cells: array<t>, nextPos: direction, appleLocation: cellId): handleTickReturn => {
+let handleTick = (cells: array<t>, nextPos: direction, appleLocation: cellId): result<
+  handleTickReturn,
+  unit,
+> => {
   let head = findSnakeHead(cells)
   let (c, appleLocation) = cells->handleApple(appleLocation, head)
 
-  let newCells = c->moveTailToHead(nextPos, head)
-  {
-    newCells: newCells,
-    appleLocation: appleLocation,
+  let newTailLocation = switch nextPos {
+  | Right => head.location + 1
+  | Left => head.location - 1
+  | Up => head.location - Board.width
+  | Down => head.location + Board.width
   }
+
+  checkSelfCollision(newTailLocation, head, cells)
+  ->Belt.Result.flatMap(() => checkBorderCollision(newTailLocation, nextPos))
+  ->Belt.Result.flatMap(() => {
+    Ok({
+      newCells: c->moveTailToHead(nextPos, head, newTailLocation),
+      appleLocation: appleLocation,
+    })
+  })
 }
 
 let initSnake = (cells: array<t>): array<t> => {
