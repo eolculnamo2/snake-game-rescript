@@ -22,6 +22,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+*.bs.js
 /lib
 .merlin
 .bsb.lock
