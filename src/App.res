@@ -24,7 +24,8 @@ type action = Tick | ChangeDirection(Cell.direction) | SnakeGrows | Retry
 
 let reducer = (state, action) => {
   switch action {
-  | Tick => if state.isGameOver {
+  | Tick =>
+    if state.isGameOver {
       state
     } else {
       let result = Cell.handleTick(state.cells, state.nextDir, state.apple)
@@ -81,14 +82,6 @@ let make = () => {
   })
 
   <div className="App">
-    {if state.isGameOver {
-      <>
-        <h1 style={ReactDOM.Style.make(~color="red", ())}> {"Game Over!"->React.string} </h1>
-        <button onClick={_ => dispatch(Retry)}> {"RETRY?"->React.string} </button>
-      </>
-    } else {
-      <> </>
-    }}
     <h1> {"Snake Game"->React.string} </h1>
     <h3> {`Score ${Belt.Int.toString(state.snakeLength - Board.initSnakeSize)}`->React.string} </h3>
     <div style={ReactDOM.Style.make(~display="flex", ~justifyContent="center", ())}>
@@ -107,5 +100,23 @@ let make = () => {
         ->React.array}
       </div>
     </div>
+    {if state.isGameOver {
+      <>
+        <h1 style={ReactDOM.Style.make(~color="red", ())}> {"Game Over!"->React.string} </h1>
+        <button
+          style={ReactDOM.Style.make(
+            ~padding="1rem",
+            ~border="0",
+            ~background="lightblue",
+            ~fontWeight="bold",
+            (),
+          )}
+          onClick={_ => dispatch(Retry)}>
+          {"RETRY?"->React.string}
+        </button>
+      </>
+    } else {
+      <> </>
+    }}
   </div>
 }
