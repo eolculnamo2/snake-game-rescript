@@ -1,12 +1,13 @@
 %%raw(`import './App.css';`)
 @val external document: 'a = "document"
 
+type gameState = Playing | Paused | GameOver
 type state = {
   cells: array<Cell.t>,
   apple: int,
   nextDir: Cell.direction,
   snakeLength: int,
-  isGameOver: bool,
+  gameState: gameState,
   hasGameStarted: bool,
 }
 
@@ -16,23 +17,23 @@ let initState = {
   apple: initAppleLocation,
   nextDir: Cell.Right,
   snakeLength: Board.initSnakeSize,
-  isGameOver: false,
+  gameState: Playing,
   hasGameStarted: false,
 }
 
-type action = Tick | ChangeDirection(Cell.direction) | SnakeGrows | Retry
+type action = Tick | ChangeDirection(Cell.direction) | SnakeGrows | Retry | TogglePause
 
 let reducer = (state, action) => {
   switch action {
   | Tick =>
-    if state.isGameOver {
+    if state.gameState != Playing {
       state
     } else {
       let result = Cell.handleTick(state.cells, state.nextDir, state.apple)
       switch result {
       | Error(errorType) => {
           ...state,
-          isGameOver: errorType == Cell.GameEnding,
+          gameState: errorType == Cell.GameEnding ? GameOver : state.gameState,
         }
       | Ok(r) => {...state, cells: r.newCells, apple: r.appleLocation}
       }
@@ -51,6 +52,14 @@ let reducer = (state, action) => {
       {...state, hasGameStarted: true}
     }
   | Retry => initState
+  | TogglePause => {
+      ...state,
+      gameState: switch state.gameState {
+      | Playing => Paused
+      | Paused => Playing
+      | GameOver => GameOver
+      },
+    }
   }
 }
 
@@ -72,10 +81,11 @@ let make = () => {
   React.useEffect0(() => {
     document["addEventListener"]("keydown", event => {
       switch event["key"] {
-      | "w" | "ArrowUp" => dispatch(ChangeDirection(Cell.Up))
-      | "s" | "ArrowDown" => dispatch(ChangeDirection(Cell.Down))
-      | "a" | "ArrowLeft" => dispatch(ChangeDirection(Cell.Left))
-      | "d" | "ArrowRight" => dispatch(ChangeDirection(Cell.Right))
+      | "w" | "ArrowUp" | "k" => dispatch(ChangeDirection(Cell.Up))
+      | "s" | "ArrowDown" | "j" => dispatch(ChangeDirection(Cell.Down))
+      | "a" | "ArrowLeft" | "h" => dispatch(ChangeDirection(Cell.Left))
+      | "d" | "ArrowRight" | "l" => dispatch(ChangeDirection(Cell.Right))
+      | "p" | " " => dispatch(TogglePause)
       | _ => ()
       }
     })
@@ -106,7 +116,7 @@ let make = () => {
         ->React.array}
       </div>
     </div>
-    {if state.isGameOver {
+    {if state.gameState == GameOver {
       <>
         <h1 style={ReactDOM.Style.make(~color="red", ())}> {"Game Over!"->React.string} </h1>
         <button
