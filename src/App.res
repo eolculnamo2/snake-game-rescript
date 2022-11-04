@@ -30,14 +30,20 @@ let reducer = (state, action) => {
     } else {
       let result = Cell.handleTick(state.cells, state.nextDir, state.apple)
       switch result {
-      | Error() => {
+      | Error(errorType) => {
           ...state,
-          isGameOver: true,
+          isGameOver: errorType == Cell.GameEnding,
         }
       | Ok(r) => {...state, cells: r.newCells, apple: r.appleLocation}
       }
     }
-  | ChangeDirection(dir) => {...state, nextDir: dir}
+  | ChangeDirection(dir) => {
+      ...state,
+      nextDir: switch Cell.validateDirectionChange(dir, state.cells) {
+      | Error(_) => state.nextDir // doesn't change if invalid direction
+      | Ok() => dir
+      },
+    }
   | SnakeGrows =>
     if state.hasGameStarted {
       {...state, snakeLength: state.snakeLength + 1}

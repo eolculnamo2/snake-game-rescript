@@ -9,7 +9,7 @@ specifiers:
   react: ^18.2.0
   react-dom: ^18.2.0
   react-scripts: 5.0.1
-  rescript: ^9.1.4
+  rescript: ^10.0.1
   web-vitals: ^1.1.2
 
 dependencies:
@@ -24,7 +24,7 @@ dependencies:
 
 devDependencies:
   gentype: 4.5.0
-  rescript: 9.1.4
+  rescript: 10.0.1
 
 packages:
 
@@ -8489,8 +8489,8 @@ packages:
     resolution: {integrity: sha512-KigOCHcocU3XODJxsu8i/j8T9tzT4adHiecwORRQ0ZZFcp7ahwXuRU1m+yuO90C5ZUyGeGfocHDI14M3L3yDAQ==}
     dev: false
 
-  /rescript/9.1.4:
-    resolution: {integrity: sha512-aXANK4IqecJzdnDpJUsU6pxMViCR5ogAxzuqS0mOr8TloMnzAjJFu63fjD6LCkWrKAhlMkFFzQvVQYaAaVkFXw==}
+  /rescript/10.0.1:
+    resolution: {integrity: sha512-XwO1GPDtoEU4H03xQE5bp0/qtSVR6YLaJRPxWKrfFgKc+LI36ODOCie7o9UJfgzQdoMYkkZyiTGZ4N9OQEaiUw==}
     hasBin: true
     requiresBuild: true
     dev: true

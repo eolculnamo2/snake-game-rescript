@@ -7,6 +7,7 @@ exception ExcessiveTailRecursion
 
 type direction = Left | Right | Up | Down
 type gameEnding = EdgeCollision | SelfCollision
+type collisionError = GameEnding | PreventAction
 type cellId = int
 
 type rec t = {
@@ -37,13 +38,23 @@ let rec findTail = (cell: t, cells: array<t>): cellId => {
 
 let checkBorderCollision = (newTailLocation: cellId, nextPos: direction) => {
   if newTailLocation > Board.area {
-    Error()
+    Error(GameEnding)
   } else if newTailLocation < 0 {
-    Error()
+    Error(GameEnding)
   } else if mod(newTailLocation, Board.width) == Board.width - 1 && nextPos == Left {
-    Error()
+    Error(GameEnding)
   } else if mod(newTailLocation, Board.width) == 0 && nextPos == Right {
-    Error()
+    Error(GameEnding)
+  } else {
+    Ok()
+  }
+}
+
+// prevent 180 degree turn
+let checkInvalidTurn = (newTailLocation, head) => {
+  let headPrev = head.prev->Belt.Option.getExn
+  if headPrev == newTailLocation {
+    Error(PreventAction)
   } else {
     Ok()
   }
@@ -53,7 +64,7 @@ let rec checkSelfCollision = (newTailLocation: cellId, head: t, cells: array<t>)
   switch head.prev {
   | Some(id) =>
     if id == newTailLocation {
-      Error()
+      Error(GameEnding)
     } else {
       let childCell = cells->Js.Array2.find(cell => cell.location == id)->Belt.Option.getExn
       checkSelfCollision(newTailLocation, childCell, cells)
@@ -128,7 +139,7 @@ let rec appendToSnake = (cells: array<t>, id, length, ~nextDir) => {
       cells
       ->Belt.Array.map(c => {
         if c.location == cell.location {
-          {...c, next: next, prev: prev}
+          {...c, next, prev}
         } else {
           c
         }
@@ -199,30 +210,40 @@ let handleApple = (cells: array<t>, appleLocation: cellId, head: t): (array<t>, 
   }
 }
 
+let getNewTailLocation = (nextPos, head) => {
+  switch nextPos {
+  | Right => head.location + 1
+  | Left => head.location - 1
+  | Up => head.location - Board.width
+  | Down => head.location + Board.width
+  }
+}
+
+let validateDirectionChange = (nextPos, cells) => {
+  let head = findSnakeHead(cells)
+  getNewTailLocation(nextPos, head)->checkInvalidTurn(head)
+}
+
 type handleTickReturn = {
   newCells: array<t>,
   appleLocation: int,
 }
 let handleTick = (cells: array<t>, nextPos: direction, appleLocation: cellId): result<
   handleTickReturn,
-  unit,
+  collisionError,
 > => {
   let head = findSnakeHead(cells)
   let (c, appleLocation) = cells->handleApple(appleLocation, head)
 
-  let newTailLocation = switch nextPos {
-  | Right => head.location + 1
-  | Left => head.location - 1
-  | Up => head.location - Board.width
-  | Down => head.location + Board.width
-  }
-
-  checkSelfCollision(newTailLocation, head, cells)
+  // this is the previous tail which will become the head at this new location
+  let newTailLocation = getNewTailLocation(nextPos, head)
+  checkInvalidTurn(newTailLocation, head)
+  ->Belt.Result.flatMap(() => checkSelfCollision(newTailLocation, head, cells))
   ->Belt.Result.flatMap(() => checkBorderCollision(newTailLocation, nextPos))
   ->Belt.Result.flatMap(() => {
     Ok({
       newCells: c->moveTailToHead(nextPos, head, newTailLocation),
-      appleLocation: appleLocation,
+      appleLocation,
     })
   })
 }
@@ -262,8 +283,7 @@ let initCells = (appleLocation: int) => {
       location: i,
     })
   }
-  let cells = initSnake(cells)
-  cells
+  initSnake(cells)
 }
 
 let isCellSnake = (cell: t) =>
