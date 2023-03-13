@@ -76,7 +76,7 @@ let rec checkSelfCollision = (newTailLocation: cellId, head: t, cells: array<t>)
 // move tail to in front of head
 // make head isHead = false and next point to previously tail
 // create new tail by remove prev
-let moveTailToHead = (cells: array<t>, nextPos: direction, head: t, newTailLocation) => {
+let moveTailToHead = (cells: array<t>, head: t, newTailLocation) => {
   let tailId = findTail(head, cells)
   let tail = cells->Js.Array2.find(c => c.location == tailId)->Belt.Option.getExn
   let tailNext = switch tail.next {
@@ -242,7 +242,7 @@ let handleTick = (cells: array<t>, nextPos: direction, appleLocation: cellId): r
   ->Belt.Result.flatMap(() => checkBorderCollision(newTailLocation, nextPos))
   ->Belt.Result.flatMap(() => {
     Ok({
-      newCells: c->moveTailToHead(nextPos, head, newTailLocation),
+      newCells: c->moveTailToHead(head, newTailLocation),
       appleLocation,
     })
   })
@@ -290,7 +290,7 @@ let isCellSnake = (cell: t) =>
   Belt.Option.isSome(cell.next) || Belt.Option.isSome(cell.prev) || cell.isHead == true
 
 @react.component
-let make = (~cell: t) => {
+let make = React.memo((~cell: t) => {
   let isSnake = isCellSnake(cell)
 
   <div
@@ -298,12 +298,11 @@ let make = (~cell: t) => {
       ~width=Board.cellSizePx,
       ~height=Board.cellSizePx,
       ~backgroundColor=switch (isSnake, cell.isApple) {
-      | (true, true) => "green" // show snake over apple
       | (false, true) => "red"
-      | (true, false) => "green"
+      | (true, true | false) => "green" // show occupied cell over apple
       | (false, false) => "gray"
       },
       (),
     )}
   />
-}
+})
